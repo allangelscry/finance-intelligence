@@ -9,7 +9,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, system, max_tokens } = req.body;
+    const body = req.body;
+    const system = body.system || '';
+    const messages = body.messages || [];
+    const max_tokens = body.max_tokens || 1500;
+
+    const payload = {
+      model: 'claude-sonnet-4-5',
+      max_tokens: max_tokens,
+      messages: messages
+    };
+
+    if (system && system.length > 0) {
+      payload.system = system;
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -18,25 +31,18 @@ export default async function handler(req, res) {
         'x-api-key': ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: max_tokens || 1500,
-        system: system || '',
-        messages: messages || []
-      })
+      body: JSON.stringify(payload)
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(response.status).json({
-        error: data.error?.message || 'Claude API error'
-      });
+      const errMsg = data?.error?.message || JSON.stringify(data);
+      return res.status(response.status).json({ error: errMsg });
     }
 
-    // Return content text directly — matches what index.html expects
-    const text = data.content?.[0]?.text || '';
-    return res.status(200).json({ text });
+    const text = data?.content?.[0]?.text || '';
+    return res.status(200).json({ text: text });
 
   } catch (err) {
     return res.status(500).json({ error: 'Proxy error: ' + err.message });
