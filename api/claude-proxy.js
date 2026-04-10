@@ -851,26 +851,39 @@ function callSection(topicName, sectionLabel, instruction) {
   .then(function(data) {
     if (data.error) throw new Error(data.error);
     var raw = data.text || '';
-    if (!raw) throw new Error('Empty response from AI.');
+    if (!raw) throw new Error('Empty response from AI — please retry.');
     return parseResponse(raw);
+  })
+  .catch(function(err) {
+    if (err.name === 'SyntaxError') throw new Error('API response error — please retry.');
+    throw err;
   });
 }
 
 function parseResponse(raw) {
+  if (!raw || typeof raw !== 'string') throw new Error('Empty response from API.');
   raw = raw.replace(/```json/gi,'').replace(/```/g,'').trim();
   raw = raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,'');
+  var s = raw.indexOf('{'), e = raw.lastIndexOf('}');
+  if (s === -1 || e === -1) {
+    var preview = raw.substring(0, 120);
+    throw new Error('API returned: ' + preview);
+  }
+  var jsonStr = raw.slice(s, e+1);
   var out = '', inStr = false, esc = false;
-  for (var i = 0; i < raw.length; i++) {
-    var c = raw[i];
+  for (var i = 0; i < jsonStr.length; i++) {
+    var c = jsonStr[i];
     if (esc) { out += c; esc = false; continue; }
     if (c === '\\') { out += c; if (inStr) esc = true; continue; }
     if (c === '"' && !esc) { inStr = !inStr; out += c; continue; }
     if (inStr && (c === '\n' || c === '\r')) { out += ' '; continue; }
     out += c;
   }
-  var s = out.indexOf('{'), e = out.lastIndexOf('}');
-  if (s === -1 || e === -1) throw new Error('No JSON found in response.');
-  return JSON.parse(out.slice(s, e+1));
+  try {
+    return JSON.parse(out);
+  } catch(e) {
+    throw new Error('JSON parse failed. Try refreshing.');
+  }
 }
 
 // ═══════════════════════════════════════════════
