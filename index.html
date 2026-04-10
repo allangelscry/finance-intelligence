@@ -674,10 +674,22 @@ tickClock(); setInterval(tickClock, 30000);
 // INIT
 // ═══════════════════════════════════════════════
 window.onload = function() {
+  // Always start with profile screen hidden
+  document.getElementById('sProfile').style.display = 'none';
   var p = localStorage.getItem('fip_p3');
   if (p) {
-    try { profile = JSON.parse(p); launchApp(); return; } catch(e) { localStorage.removeItem('fip_p3'); }
+    try {
+      var parsed = JSON.parse(p);
+      if (parsed && parsed.name) {
+        profile = parsed;
+        launchApp();
+        return;
+      }
+    } catch(e) {
+      localStorage.removeItem('fip_p3');
+    }
   }
+  // No valid profile — show entry screen
   document.getElementById('sProfile').style.display = 'flex';
   setInterval(function() {
     var val = document.getElementById('pName').value.trim();
@@ -697,6 +709,7 @@ function doStart() {
   profile.topic = profile.topic || 'ai';
   localStorage.setItem('fip_p3', JSON.stringify(profile));
   document.getElementById('sProfile').style.display = 'none';
+  document.getElementById('sProfile').style.visibility = 'hidden';
   launchApp();
 }
 
