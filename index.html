@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
-<title>Finance Intelligence Platform</title>
+<title>Finance Intelligence Platform v2.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,600;0,900;1,300;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -1047,6 +1047,15 @@ tickClock(); setInterval(tickClock, 30000);
 // INIT
 // ═══════════════════════════════════════════════
 window.onload = function() {
+  // Version check — clear old cache if outdated
+  var VERSION = 'v2.1';
+  if (localStorage.getItem('fip_version') !== VERSION) {
+    var name = '';
+    try { var p = JSON.parse(localStorage.getItem('fip_p3')||'{}'); name = p.name||''; } catch(e){}
+    localStorage.clear();
+    if (name) localStorage.setItem('fip_p3', JSON.stringify({name:name,topic:'ai'}));
+    localStorage.setItem('fip_version', VERSION);
+  }
   // Always start with profile screen hidden
   document.getElementById('sProfile').style.display = 'none';
   var p = localStorage.getItem('fip_p3');
