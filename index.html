@@ -1221,8 +1221,21 @@ function callRegSection(sectionLabel, instruction) {
     if (data.error) throw new Error(data.error);
     var raw = data.text || '';
     if (!raw) throw new Error('Empty response from AI.');
-    var parsed = parseResponse(raw);
-    return { reg: true, items: parsed.items || [] };
+    try {
+      var parsed = parseResponse(raw);
+      return { reg: true, items: parsed.items || [] };
+    } catch(e) {
+      // If JSON parse fails, return empty items with error note
+      return { reg: true, items: [{
+        name: 'Response parsing error',
+        num: 'N/A',
+        body: 'System',
+        date: 'N/A',
+        summary: 'Could not parse regulatory data. Please refresh to try again.',
+        impact: 'Medium',
+        action: 'Tap Refresh button above to reload this section.'
+      }]};
+    }
   });
 }
 
@@ -1346,10 +1359,8 @@ function loadTopic() {
   // 200ms stagger between call starts — avoids exact simultaneous burst
   t.prompts.forEach(function(p, idx) {
     setTimeout(function() {
-      if (hasError) return;
       callSection(t.name, p.lbl, p.q)
       .then(function(r) {
-        if (hasError) return;
         merged['s'+idx] = Object.assign({ lbl: p.lbl }, r);
         if (r.reg) {
           renderRegCard(key, idx, r, p);
@@ -1359,7 +1370,20 @@ function loadTopic() {
         completed++;
         if (completed === total) onAllDone();
       })
-      .catch(function(err) { onSectionError(err); });
+      .catch(function(err) {
+        // Show error in individual card instead of killing all
+        var g = document.getElementById('contentStack');
+        var skels = g.querySelectorAll('.bcard');
+        var target = skels[idx];
+        if (target) {
+          target.innerHTML = '<div class="bcard-accent" style="background:var(--gold)"></div>'
+            + '<div class="bcard-headline-zone"><div class="bcard-section-label" style="color:var(--gold)">' + p.lbl + '</div>'
+            + '<div style="font-size:13px;color:#ff8fa8;margin-top:8px;">Could not load section: ' + err.message + '</div></div>';
+          target.style.opacity = '1';
+        }
+        completed++;
+        if (completed === total) onAllDone();
+      });
     }, idx * 200);
   });
 }
