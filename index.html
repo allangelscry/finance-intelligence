@@ -828,13 +828,13 @@ function renderOtherTopics(activeKey) {
 // CLAUDE API CALL — NEW 4-PART FORMAT
 // ═══════════════════════════════════════════════
 function callSection(topicName, sectionLabel, instruction) {
-  var sys = 'You are a senior financial intelligence analyst writing for a finance team leader at SMBC Indonesia in Bekasi. Return ONLY valid JSON, no markdown, no backticks, no extra text. All string values must be on single continuous lines with no line breaks inside them.';
+  var sys = 'You are a senior financial intelligence analyst at SMBC Indonesia. Return ONLY valid JSON, no markdown, no backticks. Be concise — maximum 40 words per bullet, 60 words for ins and dd fields. All strings on single lines.';
 
   var usr = 'Topic: ' + topicName + '\nSection: ' + sectionLabel + '\n\n' + instruction + '\n\n'
-    + 'Return ONLY this JSON structure with real, specific content:\n'
-    + '{"hl":"One powerful headline insight — specific, data-driven, 15-20 words max",'
-    + '"bl":["Key insight 1 with specific data point or named institution, 40-60 words","Key insight 2 with specific data point or named institution, 40-60 words","Key insight 3 with specific data point or named institution, 40-60 words"],'
-    + '"ins":"Leadership angle: what this means specifically for a finance team leader in Indonesian banking. Analytical, direct, not generic. 3-4 sentences.",'
+    + 'Return ONLY this JSON with real content:\n'
+    + '{"hl":"Headline insight, specific, data-driven, max 15 words",'
+    + '"bl":["Insight 1 with data point, max 40 words","Insight 2 with data point, max 40 words","Insight 3 with data point, max 40 words"],'
+    + '"ins":"Write a concise self-assessment reflection for a finance team leader at SMBC Indonesia, directly based on the specific findings above. Structure it as four sharp, one-sentence takeaways labeled exactly like this — ADOPT: one specific practice or mindset from this data worth starting now. IMPROVE: one thing most finance leaders already do but are doing insufficiently based on this data. FOLLOW: one trend or development from this content that demands ongoing attention. AVOID: one specific mistake, trap, or blind spot this data warns against. Each label followed by a colon then one direct sentence. No generic advice. Every point must connect to the specific data and findings above.",'
     + '"rq":"One sharp reflection question this section raises for a finance professional. One sentence ending in a question mark.",'
     + '"dd":"Deep dive: 5-7 sentences covering mechanisms, data, implications and one concrete action step a finance leader can take this week."}';
 
@@ -844,33 +844,46 @@ function callSection(topicName, sectionLabel, instruction) {
     body: JSON.stringify({
       system: sys,
       messages: [{ role: 'user', content: usr }],
-      max_tokens: 1500
+      max_tokens: 900
     })
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (data.error) throw new Error(data.error);
     var raw = data.text || '';
-    if (!raw) throw new Error('Empty response from AI.');
+    if (!raw) throw new Error('Empty response from AI — please retry.');
     return parseResponse(raw);
+  })
+  .catch(function(err) {
+    if (err.name === 'SyntaxError') throw new Error('API response error — please retry.');
+    throw err;
   });
 }
 
 function parseResponse(raw) {
+  if (!raw || typeof raw !== 'string') throw new Error('Empty response from API.');
   raw = raw.replace(/```json/gi,'').replace(/```/g,'').trim();
   raw = raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,'');
+  var s = raw.indexOf('{'), e = raw.lastIndexOf('}');
+  if (s === -1 || e === -1) {
+    var preview = raw.substring(0, 120);
+    throw new Error('API returned: ' + preview);
+  }
+  var jsonStr = raw.slice(s, e+1);
   var out = '', inStr = false, esc = false;
-  for (var i = 0; i < raw.length; i++) {
-    var c = raw[i];
+  for (var i = 0; i < jsonStr.length; i++) {
+    var c = jsonStr[i];
     if (esc) { out += c; esc = false; continue; }
     if (c === '\\') { out += c; if (inStr) esc = true; continue; }
     if (c === '"' && !esc) { inStr = !inStr; out += c; continue; }
     if (inStr && (c === '\n' || c === '\r')) { out += ' '; continue; }
     out += c;
   }
-  var s = out.indexOf('{'), e = out.lastIndexOf('}');
-  if (s === -1 || e === -1) throw new Error('No JSON found in response.');
-  return JSON.parse(out.slice(s, e+1));
+  try {
+    return JSON.parse(out);
+  } catch(e) {
+    throw new Error('JSON parse failed. Try refreshing.');
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -983,7 +996,7 @@ function renderSingleCard(key, idx, sec, p) {
     html += '</div>';
     if (sec.ins) {
       html += '<div class="bcard-leadership-zone">';
-      html += '<div class="bcard-leadership-tag" style="color:' + t.color + '"><span style="width:14px;height:1px;background:' + t.color + ';display:inline-block;"></span>Leadership angle</div>';
+      html += '<div class="bcard-leadership-tag" style="color:' + t.color + '"><span style="width:14px;height:1px;background:' + t.color + ';display:inline-block;"></span>Self-assessment</div>';
       html += '<div class="bcard-leadership-txt">' + sec.ins + '</div>';
       html += '</div>';
     }
@@ -1049,9 +1062,9 @@ function renderContent(key, data) {
         + (buls ? '<ul class="bcard-insights-list">' + buls + '</ul>' : '')
       + '</div>'
 
-      // ZONE 3 — Leadership angle
+      // ZONE 3 — Self-assessment
       + (sec.ins ? '<div class="bcard-leadership-zone">'
-        + '<div class="bcard-leadership-tag" style="color:'+t.color+';"><span style="width:14px;height:1px;background:'+t.color+';display:inline-block;"></span>Leadership angle</div>'
+        + '<div class="bcard-leadership-tag" style="color:'+t.color+';"><span style="width:14px;height:1px;background:'+t.color+';display:inline-block;"></span>Self-assessment</div>'
         + '<div class="bcard-leadership-txt">' + sec.ins + '</div>'
       + '</div>' : '')
 
@@ -1140,7 +1153,7 @@ function doCopy(key, idx) {
   var txt = t.name + ' — ' + t.prompts[idx].lbl + '\n\n'
     + sec.hl + '\n\n'
     + (sec.bl||[]).map(function(b) { return '• ' + b; }).join('\n')
-    + '\n\nLeadership angle: ' + (sec.ins||'');
+    + '\n\nSelf-assessment: ' + (sec.ins||'');
   if (navigator.clipboard) {
     navigator.clipboard.writeText(txt).then(function() { toast('Copied!'); }).catch(function() { toast('Copy failed.'); });
   }
