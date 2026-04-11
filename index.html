@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
 <title>Finance Intelligence Platform</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,600;0,900;1,300;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
@@ -1084,6 +1087,11 @@ function doStart() {
 }
 
 function launchApp() {
+  // Safety check — if profile name is empty, show entry screen
+  if (!profile || !profile.name) {
+    document.getElementById('sProfile').style.display = 'flex';
+    return;
+  }
   document.getElementById('app').style.display = 'block';
   document.getElementById('navN').textContent = profile.name;
   document.getElementById('homeN').textContent = profile.name;
@@ -1333,18 +1341,6 @@ function loadTopic() {
   var total = t.prompts.length;
   var hasError = false;
 
-  function onAllDone() {
-    clearInterval(iv);
-    ldr.classList.remove('on');
-    rb.disabled = false; rb.classList.remove('spin');
-    var rArr = t.reflect;
-    merged.reflectQ = rArr[new Date().getDay() % rArr.length];
-    saveToCache(key, merged);
-    lastCacheTs = Date.now();
-    updateCacheUI(true, lastCacheTs);
-    document.getElementById('rfQ').textContent = merged.reflectQ;
-  }
-
   function onSectionError(err) {
     if (hasError) return;
     hasError = true;
@@ -1357,6 +1353,31 @@ function loadTopic() {
   }
 
   // 200ms stagger between call starts — avoids exact simultaneous burst
+  // Global timeout — if nothing completes in 25s, show error
+  var globalTimeout = setTimeout(function() {
+    if (completed < total) {
+      clearInterval(iv);
+      ldr.classList.remove('on');
+      rb.disabled = false; rb.classList.remove('spin');
+      var eb = document.getElementById('ebx');
+      eb.classList.add('on');
+      eb.textContent = 'Request timed out after 25 seconds — tap Refresh to try again.';
+    }
+  }, 25000);
+
+  function onAllDone() {
+    clearTimeout(globalTimeout);
+    clearInterval(iv);
+    ldr.classList.remove('on');
+    rb.disabled = false; rb.classList.remove('spin');
+    var rArr = t.reflect;
+    merged.reflectQ = rArr[new Date().getDay() % rArr.length];
+    saveToCache(key, merged);
+    lastCacheTs = Date.now();
+    updateCacheUI(true, lastCacheTs);
+    document.getElementById('rfQ').textContent = merged.reflectQ;
+  }
+
   t.prompts.forEach(function(p, idx) {
     setTimeout(function() {
       callSection(t.name, p.lbl, p.q)
